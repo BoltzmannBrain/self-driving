@@ -5,10 +5,10 @@ Vehicle speed prediction model.
 Example invocations:
 
   # Run verbose training
-  ./speed_prediction_model.py --verbosity 2
+  ./cnn_prediction.py --verbosity 2
 
   # Only run the test phase
-  ./speed_prediction_model.py --skipTraining --test
+  ./cnn_prediction.py --skipTraining --test
 
 Some suggestions for improving the model are to tune the optmizer learning rate
 and other params (currently using Keras standards), or more/larger layers

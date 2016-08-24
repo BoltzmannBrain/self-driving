@@ -11,10 +11,9 @@ Requires:
 * [OpenCV](http://opencv.org/downloads.html)
 
 
-
 ### Speed prediction with CNN+LSTM
 
-Will be posted soon! This model incorporates temporal information as an improvement over the static CNN model below.
+Will be posted soon! This is to implement some of the architectures described in ["Beyond Short Snippets: Deep Networks for Video Classification"](http://arxiv.org/abs/1503.08909) in an effort to incorporate temporal information as an improvement over the static CNN model below.
 
 ### Speed prediction with CNN
 
