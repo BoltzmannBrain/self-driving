@@ -9,7 +9,7 @@ import os
 
 
 class VideoStream(object):
-  """
+  """ Utilities class for using video data with OpenCV.
   """
   def __init__(self, videoIn):
     """ Init OpenCV video stream.
@@ -44,7 +44,8 @@ class VideoStream(object):
       yield frame
 
 
-  def robustFramesGenerator(self, truthData, batchSize, timesteps=20, visuals=None, verbosity=0):
+  def robustFramesGenerator(self, truthData, batchSize,
+                            timesteps=10, speedVisuals=False, verbosity=0):
     """ Yields X and Y data (in batches). Each yield is the frame data extended
     in the time dimension, or a "volume", where there are batchSize / timesteps
     volumes per batch.
@@ -54,8 +55,7 @@ class VideoStream(object):
           We assume that items correspond to successive video frames.
       batchSize: (int) Number of consecutive frames per batch.
       timesteps: (int) Number of timesteps to accumulate in a volume.
-      visuals: (bool)
-      visuals: (?????) Use this method to draw visuals over the video.????????????????????????
+      speedVisuals: (bool) Draw visuals over the video.
       verbosity: (int) Print detailed info or not.
     Yields:
       Two-tuple representing a batch of input video frames and target values.
@@ -109,7 +109,7 @@ class VideoStream(object):
         # Draw stuff; it's assumed the speed data is in m/s
         _drawString(frame, (20, 20), "{} {:.2f} mph".format(speed*2.237))
         _drawSpeed(frame, speed)
-        cv2.imshow("driving camera", frame)
+      cv2.imshow("driving camera", frame)
 
       if (camera.get(2) == 1) or (cv2.waitKey(1) & 0xFF==27):
         # End of video file, or user quit with 'ESC'
