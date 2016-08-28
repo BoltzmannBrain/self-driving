@@ -109,10 +109,11 @@ def buildModel(volumesPerBatch, timesteps, cameraFormat=(3, 480, 640), verbosity
   model = Sequential()
 
   # Use a lambda layer to normalize the input data
-  # import pdb; pdb.set_trace()
+  # It's necessary to specify batch_input_shape in the first layer in order to
+  # have stateful recurrent layers later
   model.add(Lambda(
       lambda x: x/127.5 - 1.,
-      batch_input_shape=(volumesPerBatch, timesteps, ch, row, col),  # necessary to specify in first layer in order to have stateful recurrent layers later
+      batch_input_shape=(volumesPerBatch, timesteps, ch, row, col),
       )
   )
 
@@ -138,11 +139,9 @@ def buildModel(volumesPerBatch, timesteps, cameraFormat=(3, 480, 640), verbosity
 
   # Add stacked LSTM layers
   # import pdb; pdb.set_trace()
-  model.add(LSTM(42, return_sequences=True,
+  model.add(LSTM(512, return_sequences=True,
                  batch_input_shape=(volumesPerBatch, timesteps, 76800), stateful=True))  # stateful specs
-  # model.add(LSTM(256, return_sequences=True))
-  # model.add(LSTM(256, return_sequences=True))
-  # model.add(LSTM(256, return_sequences=True))
+  model.add(LSTM(512, return_sequences=Truem stateful=True))
 
   # Fully connected layer
   model.add(TimeDistributed(Dense(256)))
@@ -240,7 +239,7 @@ def _runTrain(args, videoStream, truthData):
         # Not using Keras's training loss print out b/c it always shows epoch 0
         print "Training loss =", history.history["loss"][0]
 
-      if i == 7: break  # DEBUG: only use the first n batches
+      # if i == 7: break  # DEBUG: only use the first n batches
 
     # Checkpoint the model in case training breaks early
     if args.verbosity > 0:
@@ -292,7 +291,7 @@ def _runTest(args, frameGen, truthData):
                                            speedVisuals=True,
                                            verbosity=args.verbosity)):
     predictedSpeeds.extend(model.predict(XBatch).flatten().astype(float))
-    if i == 10: break  # DEBUG: only use the first n batches
+    # if i == 10: break  # DEBUG: only use the first n batches
 
   resultsPath = os.path.join(_DEFAULT_MODEL_DIR, "speed_test.json")
   with open(resultsPath, "w") as outfile:
@@ -302,7 +301,6 @@ def _runTest(args, frameGen, truthData):
   # Calculate the root mean squared error. We expect the data labels to cover
   # the full video that the model just ran prediction on.
   interpolatedDataSpeeds = prepTruthData(args.dataPath, len(predictedSpeeds))
-  import pdb; pdb.set_trace()
   rmse = ( np.linalg.norm(predictedSpeeds - interpolatedDataSpeeds) /
            np.sqrt(len(interpolatedDataSpeeds)) )
   print "Finished testing, with a RMSE =", rmse
