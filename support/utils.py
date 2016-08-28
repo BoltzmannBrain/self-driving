@@ -3,13 +3,17 @@ Utility functions for the models.
 """
 import cv2
 import json
+import logging
 import numpy as np
 import os
+
+from keras.callbacks import Callback
 
 
 
 class VideoStream(object):
   """ Utilities class for using video data with OpenCV.
+  Docs: http://docs.opencv.org/2.4/modules/highgui/doc/reading_and_writing_images_and_video.html
   """
   def __init__(self, videoIn):
     """ Init OpenCV video stream.
@@ -18,13 +22,11 @@ class VideoStream(object):
       videoIn: (str) Path to mp4 video file.
     """
     self.videoSource = cv2.VideoCapture(videoIn)
-    self.width = videoStream.get(3)
-    self.height = videoStream.get(4)
+    self.width = self.videoSource.get(3)
+    self.height = self.videoSource.get(4)
 
 
   def getVideoInfo(self):
-    """ More here: http://docs.opencv.org/2.4/modules/highgui/doc/reading_and_writing_images_and_video.html
-    """
     return {"msTime": self.videoSource.get(0),
             "frameIndex": self.videoSource.get(1),
             "relativePosition": self.videoSource.get(2),
@@ -33,12 +35,16 @@ class VideoStream(object):
     }
 
 
+  def setVideoPosition(self, position=0.0):
+    self.videoSource.set(1, position)
+
+
   def rawFramesGenerator(self):
     """ Yields next video frame on each call."""
     while self.videoSource.isOpened():
-      ret, frame = camera.read()
+      ret, frame = self.videoSource.read()
       if ret is False: continue
-      if (camera.get(2) == 1) or (cv2.waitKey(1) & 0xFF==27):
+      if (self.videoSource.get(2) == 1) or (cv2.waitKey(1) & 0xFF==27):
         # End of video file, or user quit with 'ESC'
         break
       yield frame
@@ -72,11 +78,11 @@ class VideoStream(object):
 
     if timesteps > 1:
       # For recurrent architectures
-      X = np.zeros((volumesPerBatch, timesteps, 3, height, width), dtype="uint8")
+      X = np.zeros((volumesPerBatch, timesteps, 3, self.height, self.width), dtype="uint8")
       Y = np.zeros((volumesPerBatch, timesteps, 1), dtype="float32")
     else:
       # For static models (no time dimension)
-      X = np.zeros((batchSize, 3, height, width), dtype="uint8")
+      X = np.zeros((batchSize, 3, self.height, self.width), dtype="uint8")
       Y = np.zeros((batchSize, 1), dtype="float32")
 
     if verbosity:
@@ -88,7 +94,7 @@ class VideoStream(object):
     batchCount = 0
     volumeIndex = -1
     for frameIdx, value in enumerate(truthData):
-      ret, frame = camera.read()
+      ret, frame = self.videoSource.read()
       if ret is False: continue
 
       # Update counters so we know where to allocate this frame in the data structs
@@ -105,13 +111,13 @@ class VideoStream(object):
         X[batchIndex] = np.rollaxis(frame, 2)
         Y[batchIndex] = value
 
-      if visuals:
+      if speedVisuals:
         # Draw stuff; it's assumed the speed data is in m/s
-        _drawString(frame, (20, 20), "{} {:.2f} mph".format(speed*2.237))
-        _drawSpeed(frame, speed)
+        self._drawString(frame, (20, 20), "{:.2f} mph".format(value*2.237))
+        self._drawSpeed(frame, value)
       cv2.imshow("driving camera", frame)
 
-      if (camera.get(2) == 1) or (cv2.waitKey(1) & 0xFF==27):
+      if (self.videoSource.get(2) == 1) or (cv2.waitKey(1) & 0xFF==27):
         # End of video file, or user quit with 'ESC'
         break
 
@@ -125,7 +131,7 @@ class VideoStream(object):
 
 
   @staticmethod
-  def drawString(image, target, string):
+  def _drawString(image, target, string):
     x, y = target
     cv2.putText(
         image, string, (x+1, y+1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0, 0, 0),
@@ -136,7 +142,7 @@ class VideoStream(object):
 
 
   @staticmethod
-  def drawSpeed(image, speed, frameHeight=480, frameWidth=640):
+  def _drawSpeed(image, speed, frameHeight=480, frameWidth=640):
     maxBars = 8
     numBars = min(int(speed/6)+1, maxBars)  # 6 m/s per speed bar
     for i in xrange(maxBars):
@@ -171,17 +177,18 @@ def prepTruthData(dataPath, numFrames, normalizeData=False):
   # Prep data: make sure it's in order, and use relative position (b/c seconds
   # values may be incorrect)
   driveData.sort(key = lambda x: x[0])
-  dataSpeeds = np.array([d[1] for d in driveData])
-  dataTimes = np.array([d[0] for d in driveData])
-  dataPositions = ( (dataTimes - dataTimes.min()) /
-                   (dataTimes.max() - dataTimes.min()) )
+  times = np.zeros(len(driveData))
+  speeds = np.zeros(len(driveData))
+  for i, (time, speed) in enumerate(driveData):
+    times[i] = time
+    speeds[i] = speed
+  positions = (times - times.min()) / (times.max() - times.min())
+
   if normalizeData:
-    dataSpeeds = normalize(dataSpeeds)
+    speeds = normalize(speeds)
 
   # Linearly interpolate the data to the number of video frames
-  return np.interp(np.arange(0.0, 1.0, 1.0/numFrames),
-                   dataPositions,
-                   dataSpeeds)
+  return np.interp(np.arange(0.0, 1.0, 1.0/numFrames), positions, speeds)
 
 
 
