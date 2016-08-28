@@ -36,7 +36,7 @@ from keras.layers.wrappers import TimeDistributed
 from support.utils import VideoStream, prepTruthData, LossHistory
 
 
-_DEFAULT_MODEL_DIR = "./outputs/speed_model_fuck"
+_DEFAULT_MODEL_DIR = "./outputs/speed_model"
 
 # Model architecture is based on video defaults:
 _VIDEO_CHANNELS = 3
@@ -113,8 +113,6 @@ def buildModel(volumesPerBatch, timesteps, cameraFormat=(3, 480, 640), verbosity
   model.add(Lambda(
       lambda x: x/127.5 - 1.,
       batch_input_shape=(volumesPerBatch, timesteps, ch, row, col),  # necessary to specify in first layer in order to have stateful recurrent layers later
-      # input_shape=(timesteps, ch, row, col),
-      # output_shape=(timesteps, ch, row, col)
       )
   )
 
