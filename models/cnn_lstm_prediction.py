@@ -29,7 +29,7 @@ from pprint import pprint
 from prettytable import PrettyTable
 
 from keras.models import model_from_json, Sequential
-from keras.layers import Dense, Dropout, Flatten, Lambda, ELU, LSTM, GRU
+from keras.layers import Activation, Dense, Dropout, Flatten, Lambda, LSTM
 from keras.layers.convolutional import Convolution2D
 from keras.layers.wrappers import TimeDistributed
 
@@ -108,6 +108,9 @@ def buildModel(volumesPerBatch, timesteps, cameraFormat=(3, 480, 640), verbosity
 
   model = Sequential()
 
+  if timesteps == 1:
+    raise ValueError("Not supported w/ TimeDistributed layers")
+
   # Use a lambda layer to normalize the input data
   # It's necessary to specify batch_input_shape in the first layer in order to
   # have stateful recurrent layers later
@@ -117,37 +120,43 @@ def buildModel(volumesPerBatch, timesteps, cameraFormat=(3, 480, 640), verbosity
       )
   )
 
+  # For CNN layers, weights are initialized with Gaussian scaled by fan-in and
+  # activation is via ReLU units; this is current best practice (He et al., 2014)
+
   # Several convolutional layers, each followed by ELU activation
   # 8x8 convolution (kernel) with 4x4 stride over 16 output filters
   model.add(TimeDistributed(
-      Convolution2D(16, 8, 8, subsample=(4, 4), border_mode="same")))
-  model.add(ELU())
+      Convolution2D(16, 8, 8, subsample=(4, 4), border_mode="same", init="he_normal")))
+  model.add(Activation("relu"))
   # 5x5 convolution (kernel) with 2x2 stride over 32 output filters
   model.add(TimeDistributed(
-      Convolution2D(32, 5, 5, subsample=(2, 2), border_mode="same")))
-  model.add(ELU())
+      Convolution2D(32, 5, 5, subsample=(2, 2), border_mode="same", init="he_normal")))
+  model.add(Activation("relu"))
   # 5x5 convolution (kernel) with 2x2 stride over 64 output filters
   model.add(TimeDistributed(
-      Convolution2D(64, 5, 5, subsample=(2, 2), border_mode="same")))
+      Convolution2D(64, 5, 5, subsample=(2, 2), border_mode="same", init="he_normal")))
   # TODO: Add a max pooling layer?
 
   # Flatten the input to the next layer; output shape = (None, 76800)
   model.add(TimeDistributed(Flatten()))
   # Apply dropout to reduce overfitting
   model.add(Dropout(.2))
-  model.add(ELU())
-
-  # Add stacked LSTM layers
-  # import pdb; pdb.set_trace()
-  model.add(LSTM(512, return_sequences=True,
-                 batch_input_shape=(volumesPerBatch, timesteps, 76800), stateful=True))  # stateful specs
-  model.add(LSTM(512, return_sequences=Truem stateful=True))
+  model.add(Activation("relu"))
 
   # Fully connected layer
-  model.add(TimeDistributed(Dense(256)))
+  model.add(TimeDistributed(Dense(512)))
   # More dropout
   model.add(Dropout(.2))
-  model.add(ELU())
+  model.add(Activation("relu"))
+
+  # Add stacked (stateful) LSTM layers
+  model.add(LSTM(512,
+                 return_sequences=True,
+                 batch_input_shape=(volumesPerBatch, timesteps, 512),
+                 stateful=True))
+  model.add(LSTM(512,
+                 return_sequences=True,
+                 stateful=True))
 
   # Fully connected layer with one output dimension (representing the predicted
   # value).
@@ -186,7 +195,13 @@ def _runTrain(args, videoStream, truthData):
   Out:
     JSON and keras files of the saved model.
   """
+  if args.validation != 0.0 and args.validation != 0.5:
+    raise ValueError("Only 0.0 and 0.5 validation splits are supported for "
+        "stateful models (b/c the batch_input_shape changes between training "
+        "and validation data.")
+
   volumesPerBatch = args.batchSize / args.timesteps
+  trainingBatchSize = volumesPerBatch - (volumesPerBatch * args.validation)
   if args.loadModel:
     modelPath = os.path.join(_DEFAULT_MODEL_DIR, args.loadModel+".json")
     with open(modelPath, "r") as infile:
@@ -195,7 +210,7 @@ def _runTrain(args, videoStream, truthData):
     model.load_weights(os.path.join(_DEFAULT_MODEL_DIR, args.loadModel+".keras"))
     print "Model loaded from", modelPath
   else:
-    model = buildModel(volumesPerBatch=volumesPerBatch,
+    model = buildModel(volumesPerBatch=trainingBatchSize,
                        timesteps=args.timesteps,
                        cameraFormat=(_VIDEO_CHANNELS, _VIDEO_HEIGHT, _VIDEO_WIDTH),
                        verbosity=args.verbosity)
@@ -239,8 +254,6 @@ def _runTrain(args, videoStream, truthData):
         # Not using Keras's training loss print out b/c it always shows epoch 0
         print "Training loss =", history.history["loss"][0]
 
-      # if i == 7: break  # DEBUG: only use the first n batches
-
     # Checkpoint the model in case training breaks early
     if args.verbosity > 0:
       print "\nEpoch {} complete, checkpointing the model.".format(epoch)
@@ -282,33 +295,32 @@ def _runTest(args, frameGen, truthData):
   model.compile(optimizer="adam", loss="mse")
   model.load_weights(os.path.join(_DEFAULT_MODEL_DIR, modelName+".keras"))
 
-  # Run prediction on the yielded test data
-  predictedSpeeds = []  # TODO: preallocate array for len(truthData)
-  # predictedSpeeds = np.zeros(len(truthData))
-  for i, (XBatch, _) in enumerate(frameGen(truthData,
+  # Run inference
+  predictedSpeeds = []  # TODO: preallocate arrays for len(truthData)
+  truthSpeeds = []
+  for i, (XBatch, YBatch) in enumerate(frameGen(truthData,
                                            args.batchSize,
                                            timesteps=args.timesteps,
                                            speedVisuals=True,
                                            verbosity=args.verbosity)):
     predictedSpeeds.extend(model.predict(XBatch).flatten().astype(float))
-    # if i == 10: break  # DEBUG: only use the first n batches
+    truthSpeeds.extend(YBatch.flatten())
 
   resultsPath = os.path.join(_DEFAULT_MODEL_DIR, "speed_test.json")
   with open(resultsPath, "w") as outfile:
-    json.dump(predictedSpeeds, outfile)
+    json.dump(list(predictedSpeeds), outfile)
   print "Test results written to", resultsPath
 
   # Calculate the root mean squared error. We expect the data labels to cover
   # the full video that the model just ran prediction on.
-  interpolatedDataSpeeds = prepTruthData(args.dataPath, len(predictedSpeeds))
-  rmse = ( np.linalg.norm(predictedSpeeds - interpolatedDataSpeeds) /
-           np.sqrt(len(interpolatedDataSpeeds)) )
+  rmse = ( np.linalg.norm(predictedSpeeds - truthSpeeds) /
+           np.sqrt(len(truthSpeeds)) )
   print "Finished testing, with a RMSE =", rmse
 
   if args.verbosity > 0:
     # Show line plot of results
     # TODO: use plotly
-    plt.plot(interpolatedDataSpeeds)
+    plt.plot(truthSpeeds)
     plt.plot(predictedSpeeds)
     plt.show()
 
