@@ -20,7 +20,7 @@ The specific task here is to predict driving speed from a dashboard-mounted came
 
 Check out [speed_prediction.md](speed_prediction.md) for more.
 
-![](training_screenshot.png?raw=true "Screenshot from training" =400x)
+![](training_screenshot.png?raw=true "Screenshot from training" =250x)
 
 
 
