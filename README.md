@@ -18,6 +18,10 @@ The specific task here is to predict driving speed from a dashboard-mounted came
 2. **CNN + LSTM** -- In order to incorporate temporal info into the static CNN, I experimented with several architectures discussed in ["Beyond Short Snippets: Deep Networks for Video Classification"](http://arxiv.org/abs/1503.08909). The resulting model is in models/cnn_lstm_prediction.py.
 3. **Optical flow** -- Tracking feature points with sparse optical flow implicitly encodes temporal dependencies between frames. (This model will be pushed soon!)
 
+Check out [speed_prediction.md](speed_prediction.md) for more.
+
+![](training_screenshot.png?raw=true "Screenshot from training" =400x)
+
 
 
 ## Datasets

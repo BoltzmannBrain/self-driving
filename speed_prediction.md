@@ -1,19 +1,10 @@
-# Prediction models
+## Prediction models
 
-## Note this is a WIP and will be updated soon with better explanation, more models, data, etc. Check back soon!
-
-In this directory are deep learning models for prediction tasks on self-driving car data. The models here use Keras with the TensorFlow backend.
-
-Requires:
-
-* [Keras](https://github.com/fchollet/keras/)
-* [TensorFlow](https://www.tensorflow.org/versions/r0.10/get_started/os_setup.html)
-* [OpenCV](http://opencv.org/downloads.html)
-
+The speed prediction models here use Keras with TensorFlow backend, and make use of some OpenCV tools.
 
 ### Speed prediction with CNN+LSTM
 
-Will be posted soon! This is to implement some of the architectures described in ["Beyond Short Snippets: Deep Networks for Video Classification"](http://arxiv.org/abs/1503.08909) in an effort to incorporate temporal information as an improvement over the static CNN model below.
+This is to implement some of the architectures described in ["Beyond Short Snippets: Deep Networks for Video Classification"](http://arxiv.org/abs/1503.08909) in an effort to incorporate temporal information as an improvement over the static CNN model below.
 
 ### Speed prediction with CNN
 
@@ -33,7 +24,6 @@ To test the model:
 
 The test results will be written to "speed_test.json" and plotted, and the RMSE will be calculated.
 
-<!--![](test_screenshot.png?raw=true "Screenshot from testing" =350x)-->
 
 #### Future work
 
