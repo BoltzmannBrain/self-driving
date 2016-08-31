@@ -28,7 +28,7 @@ To test the model:
 The test results will be written to "speed_test.json" and plotted, and the RMSE will be calculated.
 
 
-#### Future work
+### Future work
 
 There are a number of suggestions for improving these models, some listed below:
 
