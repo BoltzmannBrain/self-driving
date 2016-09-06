@@ -192,13 +192,12 @@ class OpticalFlow(object):
 
   def runGenerator(self):
     """ Iterate through the video stream, yielding an optical flow mask for each
-    frame.
+    frame. For each frame, we get the points of the optical flow tracks,
+    calculate their spatial changes from the last frame ("deltas"), draw their
+    tracking lines, and re-detect feature points (every few frames).
 
-    For each frame, we get the points of the optical flow tracks, calculate
-    their spatial changes from the last frame ("deltas"), draw their tracking
-    lines, and re-detect feature points (every few frames).
-
-
+    Yields:
+      List of optical flow tracks, each a list of (x,y) coords.
     """
     tracks = []
     frameIndex = 0
